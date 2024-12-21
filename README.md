@@ -2,22 +2,23 @@
 
 **Cellular Energetics Analysis Software**
 
-<!-- badges: start -->
-[![R-CMD-check](https://github.com/jamespeapen/ceas/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jamespeapen/ceas/actions/workflows/R-CMD-check.yaml)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10067116.svg)](https://doi.org/10.5281/zenodo.10067116)
+[![DOI](https://img.shields.io/badge/DOI-10.1093%2Fbioinformatics%2Fbtae503-blue)](https://doi.org/10.1093/bioinformatics/btae503)
 
+<!-- badges: start -->
+[![CRAN release](https://www.r-pkg.org/badges/version-ago/ceas)](https://cran.r-project.org/package=ceas)
+[![downloads](https://cranlogs.r-pkg.org/badges/grand-total/ceas)](https://cran.r-project.org/package=ceas)
+[![R-CMD-check](https://github.com/jamespeapen/ceas/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jamespeapen/ceas/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 ## Description
 
-Analysis and visualization of cellular energetics data from Agilent Seahorse
-XF96. Cellular energetics is how cells make, use, and distribute units of energy
-(primarily ATP). Measuring real-time cellular energetics is essential to
-understanding a tissue or cell’s bioenergetic state and fuel dependencies. The
-Seahorse machine measures a cell’s or matrix’s oxygen consumption rate (OCR) – a
-proxy of oxidative phosphorylation – and extracellular acidification rate – a
-proxy of glycolysis. This package offers flexible and fast analysis and plotting
-capabilities for such data.
+Measuring cellular energetics is essential to understanding a matrix’s (e.g.
+cell, tissue or biofluid) metabolic state. The Agilent Seahorse machine is a
+common method to measure real-time cellular energetics, but existing analysis
+tools are highly manual or lack functionality. The Cellular Energetics Analysis
+Software (ceas) R package fills this analytical gap by providing modular and
+automated Seahorse data analysis and visualization using the methods described
+by [Mookerjee et al. (2017)](https://doi.org/10.1074/jbc.m116.774471).
 
 #### Pronunciation
 
@@ -33,10 +34,16 @@ install.packages("ceas")
 
 ### Github
 
-You can install the development version from Github by cloning the repo and running
+You can install the release or development versions from GitHub by cloning the
+repo. The code on the `main` branch is in sync with the CRAN releases while the
+`dev` branch has the latest updates. Documentation for the dev branch can be
+found on the [dev page](https://jamespeapen.github.io/ceas/dev/) of the website
+(`/dev`).
+
 
 ```bash
 git clone https://github.com/jamespeapen/ceas/
+git clone -b dev https://github.com/jamespeapen/ceas/ # dev version
 R CMD INSTALL ceas
 ```
 
@@ -44,18 +51,28 @@ You can also use the R [`devtools`](https://devtools.r-lib.org/) package:
 
 ```r
 devtools::install_github("jamespeapen/ceas")
+devtools::install_github("jamespeapen/ceas", ref = "dev") # dev version
 ```
 
 or [`pak`](https://pak.r-lib.org/):
 
 ```r
 pak::pkg_install("jamespeapen/ceas")
+pak::pkg_install("jamespeapen/ceas@dev") # dev version
 ```
 
 ## Usage
 
 A user guide is available on the [package website](https://jamespeapen.github.io/ceas/).
 Bug reports may be submitted through [GitHub issues](https://github.com/jamespeapen/ceas/issues).
+
+## Citation
+
+If you use *ceas* please cite
+
+Rachel (Rae) J House, James P Eapen, Hui Shen, Carrie R Graveel, Matthew R
+Steensma (2024). ceas: An R package for Seahorse data analysis and
+visualization, Bioinformatics, 40(8), btae503
 
 ## Contributing
 

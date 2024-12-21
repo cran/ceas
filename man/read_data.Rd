@@ -4,13 +4,20 @@
 \alias{read_data}
 \title{Read Seahorse Wave Excel File}
 \usage{
-read_data(rep_list, norm = NULL, sheet = 2, delimiter = " ")
+read_data(
+  rep_list,
+  norm = NULL,
+  sheet = 2,
+  delimiter = " ",
+  norm_column = "exp_group",
+  norm_method = "minimum"
+)
 }
 \arguments{
 \item{rep_list}{A list of Seahorse Wave excel export files. One file per
 replicate. If your data is in a directory called "seahorse_data", use
 \code{list.files("seahorse_data", pattern = "*.xlsx", full.names = TRUE)} to make
-a list of the excel files.}
+a list of the excel files. Add multiple replicates with care - see details.}
 
 \item{norm}{A csv file with the experimental groups and their normalization
 values. Leave unset if normalization is not required. See \code{\link[=normalize]{normalize()}}.}
@@ -22,6 +29,17 @@ sheet 2}
 \item{delimiter}{The delimiter between the group name and the assay type in
 the Group column of the wave output. e.g. "Group1 MITO" would use a space
 character as delimiter.}
+
+\item{norm_column}{Whether to normalize by \code{"Well"} or \code{"exp_group"} column.
+The first column of the normalization csv provided should match this value.}
+
+\item{norm_method}{How to normalize each well or experimental group (specified by \code{norm_column}):
+\itemize{
+\item by its corresponding row in the \code{norm} csv (\code{"self"}) or
+\item by the minimum of the \code{measure} column in the provided \code{norm} csv (\code{"minimum"}).
+}
+
+See the \code{normalize()} function for more details.}
 }
 \value{
 a seahorse_rates table
@@ -30,15 +48,43 @@ a seahorse_rates table
 Reads input seahore data from an excel Seahorse Wave File. It  assumes your
 data is background normalized.
 }
+\details{
+Although ceas enables integration of multiple biological and/or technical
+replicates, previous work has reported high inter-plate variation (Yepez et.
+al 2018). If you don't want your replicate data combined, you can either:
+\itemize{
+\item make sure that the names of the common groups between the replicates are
+different.
+\item in downstream analyses (\code{get_energetics_summary}, \code{bioscope_plot},
+\code{rate_plot}, \code{atp_plot}), use \code{sep_reps = TRUE} to do all calculations and
+plotting separately for each replicate.
+}
+
+\strong{NOTE:} to maintain backwards compatibility \code{sep_reps} is currently
+\code{FALSE} by default, but will be set to \code{TRUE} in a future release.
+}
 \examples{
 rep_list <- system.file("extdata", package = "ceas") |>
   list.files(pattern = "*.xlsx", full.names = TRUE)
 seahorse_rates <- read_data(rep_list, sheet = 2)
 head(seahorse_rates, n = 10)
 
-# normalization
+# normalization by well using raw cell count or protein quantity
 norm_csv <- system.file("extdata", package = "ceas") |>
-  list.files(pattern = "norm.csv", full.names = TRUE)
-seahorse_rates.norm <- read_data(rep_list, norm = norm_csv, sheet = 2)
+  list.files(pattern = "well_norm.csv", full.names = TRUE)
+seahorse_rates.norm <- read_data(
+  rep_list,
+  norm = norm_csv,
+  norm_column = "well",
+  norm_method = "self",
+  sheet = 2
+)
 head(seahorse_rates.norm, n = 10)
+}
+\references{
+Yépez \emph{et al.} 2018
+\emph{OCR-Stats: Robust estimation and statistical testing of mitochondrial
+respiration activities using Seahorse XF Analyzer}
+\emph{PLOS ONE} 2018;\strong{13}:e0199938.
+\doi{10.1371/journal.pone.0199938}
 }

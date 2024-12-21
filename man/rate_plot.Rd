@@ -8,9 +8,13 @@ rate_plot(
   seahorse_rates,
   measure = "OCR",
   assay = "MITO",
+  model = "ols",
   error_bar = "ci",
   conf_int = 0.95,
-  group_label = "Experimental group"
+  group_label = "Experimental group",
+  linewidth = 2,
+  sep_reps = FALSE,
+  ci_method = "Wald"
 )
 }
 \arguments{
@@ -20,11 +24,24 @@ rate_plot(
 
 \item{assay}{What assay to plot (e.g. "MITO" or "GLYCO")}
 
+\item{model}{The model used to estimate mean and confidence intervals:}
+
 \item{error_bar}{Whether to plot error bars as standard deviation (\code{"sd"}) or confidence intervals (\code{"ci"})}
 
 \item{conf_int}{The confidence interval percentage. Should be between 0 and 1}
 
 \item{group_label}{Label for the experimental group to populate the legend title}
+
+\item{linewidth}{Width for the lines, passed to \code{geom_line()}}
+
+\item{sep_reps}{Whether to calculate summary statistics on the groups with
+replicates combined. The current default \code{FALSE} combines replicates, but
+future releases will default to \code{TRUE} providing replicate-specific
+summaries.}
+
+\item{ci_method}{The method used to compute confidence intervals for the
+mixed-effects model: \code{"Wald"}, \code{"profile"}, or \code{"boot"} passed to
+\code{lme4::confint.merMod()}.}
 }
 \value{
 a ggplot
@@ -36,5 +53,18 @@ Generate OCR and ECAR plots
 rep_list <- system.file("extdata", package = "ceas") |>
   list.files(pattern = "*.xlsx", full.names = TRUE)
 seahorse_rates <- read_data(rep_list, sheet = 2)
-rate_plot(seahorse_rates, measure = "OCR", error_bar = "ci", conf_int = 0.95)
+rate_plot(
+  seahorse_rates,
+  measure = "OCR",
+  error_bar = "ci",
+  conf_int = 0.95,
+  sep_reps = FALSE
+)
+rate_plot(
+  seahorse_rates,
+  measure = "OCR",
+  error_bar = "ci",
+  conf_int = 0.95,
+  sep_reps = TRUE
+)
 }

@@ -24,10 +24,19 @@ library(ceas)
 
 ## Importing Seahorse rates data
 
-The `read_data` function takes a list of Excel files. An easy way to get
-such a list is to put all your data in a directory and list its contents. Here
-we use the package's internal datasets, but `list.files` will take a directory
-name as its first argument.
+The read_data function imports a list of Wave excel export file(s), meaning it
+will import all `.xlsx` files from a common directory. With that, the user
+should organize the file(s) they wish to analyze in a single directory (folder).
+This directory can also contain the normalization CSV file (see
+[Normalization](#normalization)). An easy way to get such a list is to put all
+your data in a directory and list its contents. For example, if your data is in
+a directory called "seahorse_data":
+
+```{r data_custom_dir, eval=FALSE}
+rep_list <- list.files("seahorse_data", pattern = "*.xlsx", full.names = TRUE)
+```
+
+In this vignette we use the package's internal datasets:
 
 ```{r data}
 rep_list <- system.file("extdata", package = "ceas") |>
@@ -37,11 +46,18 @@ knitr::kable(head(raw_data))
 ```
 
 The data requires the following columns: `r colnames(raw_data)`. The `Group`
-column needs to be in the format `biological_group<space>Assay_type` as shown
-above. Upon reading with `read_data`, the `Group` column is split into two
-`group` and `assay` columns on the space. This output format can be set in the
-Seahorse machine before starting the experiment. If you already have the data,
-this column will have to be converted to this format to work with ceas.
+column needs to be in the format `biological_group<delimiter>Assay_type` (with
+`<space>` as the default delimiter) as shown above. Upon reading with
+`read_data`, the `Group` column is split into two at the delimiter character and
+used to populate the `group` and `assay` columns. This output format can be set
+in the Seahorse machine before starting the experiment. The user can choose to
+either
+
+- name their wells according to the *ceas* format on the Wave software or
+
+- manually rename each Group in the Wave excel output before importing via
+`read_data.` If you already have the data, this column will have to be converted
+to this format to work with *ceas*.
 
 ```{r read_dataformat}
 seahorse_rates <- read_data(rep_list)
@@ -50,27 +66,69 @@ knitr::kable(head(seahorse_rates))
 
 ### Normalization
 
-There are two types of normalization involved in Seahorse data analysis. One is
-background normalization done by the Wave software. *ceas* will produce a
-warning if it finds that the "Background" data are not 0 (see first row of the
-table above).
+There are two types of normalization involved in Seahorse data analysis. The
+first type of normalization is background normalization, which is typically
+performed within in the Seahorse Wave software. If the Seahorse data has been
+background normalized, the “Background” wells should have OCR and ECAR values of
+0. *ceas* will flag the user with a warning if the “Background” OCR and ECAR
+   values are not 0 (see first row of the table above).
 
-The other is biological normalization based on the cell count or the mass of
-protein. If the data is not already biologically normalized, you will need a csv
-file containing experimental groups and cell counts or $\mu$g of protein in this
-format:
+The second type of normalization is sample normalization, which can be performed
+using *ceas*. Example sample normalization measures include cell count per well
+and $\mu$g of protein per well. Sample normalization using *ceas* requires an
+additional CSV file containing two columns:
+
+1. `"exp_group"` or `"well"`
+
+2. experimental measure values (e.g. cell counts) in this format:
 
 ```{r, norm_csv}
 norm_csv <- system.file("extdata", package = "ceas") |>
   list.files(pattern = "norm.csv", full.names = TRUE)
-read.csv(norm_csv) |> knitr::kable()
+norm_csv
+exp_group_norm <- norm_csv[1]
+well_norm <- norm_csv[2]
+
+read.csv(exp_group_norm) |>
+    knitr::kable(caption = "For normalizing by experimental group")
+read.csv(well_norm) |> head() |>
+    knitr::kable(caption = "For normalizing by well")
 ```
 
-Your csv file's full path may be passed into `read_data()` using the `norm`
-argument.
+For sample normalization *ceas* can use one of two normalizing methods according
+to the provided `norm_method` argument:
+
+- `"self"`: for each experimental group or well, the rows of the Seahorse data
+are divided by the corresponding `measure` value. Each OCR, ECAR, and PER value
+is divided by the measure it"self". OCR and ECAR values are divided by the
+corresponding raw value in the "measure" column. This can be thought of as an
+intra-well/experimental group normalization. Each normalized value is then
+interpreted as pmol/min per cell or pmol/min per \eqn{\mu}g of protein.
+
+- `"minimum"`: When set to `"minimum"`, each OCR, ECAR, and PER value is
+normalized by the minimum value in the `norm_csv` "measure" column. In this
+method, every "measure" column's value in the provided CSV file is divided by
+the lowest of the "measure" values to get a normalization factor for each well
+or experimental group. The OCR, ECAR, and PER values in each well or
+experimental group are divided by their corresponding normalization factors.
+Compared to `"self"`, this can be thought of as an inter-well/experimental group
+normalization based on the lowest `"measure"`. The results may be interpreted as
+pmol/min per minimum of the group cell count or \eqn{\mu}g of protein.
+
+Your normalization CSV file path may be passed into `read_data()` using the
+`norm` argument along with `norm_column` with either `"exp_group"` or `"well"`
+and `norm_method` as either `"self"` or `"minimum"`.
+
+**Note**: it is important to minimize sample variability during your Seahorse
+experiment.
 
 ```{r normalized_read}
-read_data(rep_list, norm = norm_csv) |> head() |> knitr::kable()
+read_data(
+    rep_list,
+    norm = exp_group_norm,
+    norm_column = "exp_group",
+    norm_method = "self"
+) |> head() |> knitr::kable()
 ```
 
 ## Calculating energetics
@@ -90,9 +148,10 @@ partitioned_data <- partition_data(seahorse_rates)
 
 #### Alternative data formats {.tabset}
 
-While the default options are set for an experiment with both a mitochondrial
-and glycolysis assay, if you have only a mitochondrial assay or no glycolysis
-assay, the `assay_types` list parameter can be modified to account for that.
+The default `partition_data()` parameters are set to analyze (1) Mito Stress
+Test and (2) Glycolysis Stress Test assays run in parallel in the same
+experiment. The `assay_types` list parameter can be modified to account for
+alternative experiments (e.g. just a Mito Stress Test assay).
 
 ##### Mito + Glyco (our default)
 
@@ -207,7 +266,7 @@ calculations](atp_calculation.html).
 
 ## Plotting
 
-### Bioenergetic scope plot
+### Bioenergetic scope plot {.tabset}
 
 The `bioscope_plot` function plots a 2D representation of group “bioenergetic
 scope.” Bioenergetic scope describes the theoretical energetic space in which a
@@ -217,11 +276,30 @@ and/or max JATP from OXPHOS and glycolysis and the vertical and horizontal lines
 represent the standard deviation or confidence interval of JATP from OXPHOS or
 glycolysis, respectively.
 
-```{r bioscope_plot}
-(bioscope <- bioscope_plot(energetics))
+#### Replicates combined
+
+```{r bioscope_plot, fig.cap="Bioenergetic scope with replicates combined", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+bioscope <- bioscope_plot(
+  energetics,
+  model = "ols",
+  sep_reps = FALSE
+)
+bioscope
 ```
 
-### Rate plots {.tabset}
+#### Replicates as random effects
+
+```{r bioscope_plot_lme, fig.cap="Bioenergetic scope based on a mixed-effects model with replicates as random effect", message = FALSE, out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+bioscope_plot(energetics, sep_reps = FALSE, model = "mixed")
+```
+
+#### Replicates separated
+
+```{r bioscope_plot_sep_reps, fig.cap="Bioenergetic scope with replicates separated", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+bioscope_plot(energetics, sep_reps = TRUE, model = "ols")
+```
+
+### Rate plots
 
 The `rate_plot` function provides an overview of OCR or ECAR for each assay type
 over time, which enables cross-group energetic comparisons before and after the
@@ -229,16 +307,86 @@ addition of energetic-modulating compounds. The `rate_plot` line represents mean
 group OCR or ECAR over the sequential measurements (x-axis) and the shaded
 variance region represents standard deviation or specified confidence interval.
 
-#### Oxygen consumption rate (OCR)
+#### Oxygen consumption rate (OCR) {.tabset}
 
-```{r ocr}
-(ocr <- rate_plot(seahorse_rates, measure = "OCR", assay = "MITO"))
+##### Replicates combined
+
+```{r ocr, fig.cap="OCR with replicates combined", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+ocr <- rate_plot(
+  seahorse_rates,
+  measure = "OCR",
+  assay = "MITO",
+  model = "ols",
+  sep_reps = FALSE
+)
+ocr
 ```
 
-#### Extracellular Acidification Rate (ECAR)
+##### Replicates as random effects
 
-```{r ecar}
-(ecar <- rate_plot(seahorse_rates, measure = "ECAR", assay = "GLYCO"))
+```{r ocr_lme, fig.cap="OCR based on mixed-effects model", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+rate_plot(
+  seahorse_rates,
+  measure = "OCR",
+  assay = "MITO",
+  model = "mixed",
+  sep_reps = FALSE
+)
+```
+
+##### Replicates separated
+
+```{r ocr_sep_reps, fig.cap="OCR with replicates separated", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+rate_plot(
+  seahorse_rates,
+  measure = "OCR",
+  assay = "MITO",
+  model = "ols",
+  sep_reps = TRUE,
+  linewidth = 1
+)
+```
+
+
+#### Extracellular Acidification Rate (ECAR) {.tabset}
+
+##### Replicates combined
+
+```{r ecar, fig.cap="ECAR with replicates combined", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+ecar <- rate_plot(
+  seahorse_rates,
+  measure = "ECAR",
+  assay = "GLYCO",
+  model = "ols",
+  sep_reps = FALSE
+)
+ecar
+```
+
+##### Replicates as random effects
+
+```{r ecar_lme, fig.cap="ECAR based on mixed-effects model", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+rate_plot(
+  seahorse_rates,
+  measure = "ECAR",
+  assay = "GLYCO",
+  model = "mixed",
+  sep_reps = FALSE
+)
+```
+
+##### Replicates separated
+
+```{r ecar_sep, fig.cap="ECAR with replicates separated", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+rate_plot(
+  seahorse_rates,
+  measure = "ECAR",
+  assay = "GLYCO",
+  model = "ols",
+  sep_reps = TRUE,
+  linewidth = 1
+
+)
 ```
 
 ### ATP plots {.tabset}
@@ -251,28 +399,52 @@ confidence interval JATP variance.
 
 #### Basal glycolysis
 
-```{r basal_glyc}
-(basal_glyc <- atp_plot(energetics, basal_vs_max = "basal", glyc_vs_resp = "glyc"))
+```{r basal_glyc, fig.cap="JATP from basal glycolysis with replicates combined", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+basal_glyc <- atp_plot(
+  energetics,
+  basal_vs_max = "basal",
+  glyc_vs_resp = "glyc",
+  sep_reps = FALSE
+)
+basal_glyc 
 ```
 
 #### Basal respiration
 
-```{r basal_resp}
-(basal_resp <- atp_plot(energetics, basal_vs_max = "basal", glyc_vs_resp = "resp"))
+```{r basal_resp, fig.cap="JATP from basal respiration with replicates separated", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+atp_plot(
+  energetics,
+  basal_vs_max = "basal",
+  glyc_vs_resp = "resp",
+  model = "ols",
+  sep_reps = TRUE
+)
 ```
 
 
 #### Maximal glycolysis
 
-```{r max_glyc}
-(max_glyc <- atp_plot(energetics, basal_vs_max = "max", glyc_vs_resp = "glyc"))
+```{r max_glyc, fig.cap="JATP from maximal glycolysis with a mixed-effects model", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+atp_plot(
+  energetics,
+  basal_vs_max = "max",
+  glyc_vs_resp = "glyc",
+  model = "mixed",
+  sep_reps = FALSE
+)
 ```
 
 
 #### Maximal respiration
 
-```{r max_resp}
-(max_resp <- atp_plot(energetics, basal_vs_max = "max", glyc_vs_resp = "resp"))
+```{r max_resp, fig.cap="JATP from maximal respiration replicates combined", out.width = "100%", fig.dim = c(5, 3), dpi = 120}
+atp_plot(
+  energetics,
+  basal_vs_max = "max",
+  glyc_vs_resp = "resp",
+  model = "ols",
+  sep_reps = TRUE
+)
 ```
 
 ### Customizing plots
@@ -285,18 +457,18 @@ add the custom colors you'd like:
 
 #### Colors
 
-```{r custom_colors}
+```{r custom_colors, out.width = "100%", fig.dim = c(5, 3), dpi = 120}
 custom_colors <- c("#e36500", "#b52356", "#3cb62d", "#328fe1")
 ```
 
-```{r}
+```{r, , out.width = "100%", fig.dim = c(5, 3), dpi = 120}
 bioscope +
 ggplot2::scale_color_manual(
   values = custom_colors
 )
 ```
 
-```{r}
+```{r, out.width = "100%", fig.dim = c(5, 3), dpi = 120}
 ocr +
 ggplot2::scale_color_manual(
   values = custom_colors
@@ -307,14 +479,14 @@ ggplot2::scale_color_manual(
 
 ##### Change axis labels
 
-```{r}
+```{r, out.width = "100%", fig.dim = c(5, 3), dpi = 120}
 ecar +
     ggplot2::labs(x = "Time points")
 ```
 
 ##### Change label size
 
-```{r}
+```{r, out.width = "100%", fig.dim = c(5, 3), dpi = 120}
 basal_glyc +
     ggplot2::theme(axis.text = ggplot2::element_text(size = 20))
 ```
